@@ -127,11 +127,10 @@ confusionMatrix(predRF_ctrl, myTesting$classe)
 
 I use RF with cross validation of K = 3 to predict on the final test set.
 
-The Random Forest model with either preprocessing or cross validation produces extremely an extremely accurate model for predicting whether the barbell lift was done correctly as defined by the 5 classes. 
+The Random Forest model with either preprocessing or cross validation produces extremely an extremely accurate model for predicting whether the barbell lift was done correctly as defined by the 5 classes. The out of sample error is estimated to be 0 since the model was was able to complete predict outcomes on the testing set.
 
 ```{r echo= FALSE}
 predFinal <- predict(modelRF_ctrl, testing)
-predFinal
 
 Results <- data.frame(
   problem_id=testing$problem_id,
@@ -139,3 +138,4 @@ Results <- data.frame(
 )
 print(Results)
 ```
+
