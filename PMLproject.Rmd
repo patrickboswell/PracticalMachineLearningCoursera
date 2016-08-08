@@ -1,0 +1,141 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "Patrick Boswell"
+date: "August 7, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, the goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+###Data
+
+The training data for this project are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+###Objective
+
+The goal of this project is to predict the manner in which a participant perfoemed a barbell lift, as defined by the five classes A through E. 
+
+The report will also include the following:
+
+1. How the model was built.
+2. How cross validation was used.
+3. What the expected out of sample error is.
+4. Explanation of model choices.
+
+##Setup
+
+Load libraries that will be used in this exercise:
+
+```{r}
+library(caret)
+library(randomForest)
+library(curl)
+```
+
+Retrieve training and testing data:
+
+```{r cache=TRUE}
+dtraining <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", na.strings = c("NA","#DIV/0!",""))
+testing <-  read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", na.strings = c("NA","#DIV/0!",""))
+```
+
+###Preprocessing
+
+Because there are a large number of variables with > 95% NA values we will need to remove these for the models to function properly. I will also remove variables with near zero variance. The first 7 rows also contain data that is not useful for prediction and are disgarded.
+
+```{r cache=TRUE}
+training <- dtraining[,-(1:7)]
+training <- training[,-nearZeroVar(training)]
+mostlyNA <- sapply(training, function(x) mean(is.na(x))) > 0.95
+training <- training[,mostlyNA == F]
+```
+
+Cleaning the data reduces the number of variables to 53 including the outcome variable, "classe".
+
+The models will be fit using the following variables:
+
+```{r echo=FALSE}
+names(training[,-53])
+```
+
+
+###Data partitioning
+
+With the training dataset cleaned I partition the data into a training set and testing set to help pick a prediction model.
+
+```{r cache=TRUE}
+set.seed(1337)
+inTrain <- createDataPartition(y = training$classe, p = 0.7, list = FALSE)
+myTraining <- training[inTrain,] 
+myTesting <- training[-inTrain,]
+```
+
+##Modeling
+
+I choose to use a K-nearest neighbors (KNN) and Random Forest (RF) for training and comparison of the models.
+
+```{r cache = TRUE}
+modelKNN <- train(classe ~., data = myTraining, method = "knn")
+modelRF <- train(classe~., data = myTraining, method = "rf", preProcess  = c("center","scale"))
+```
+
+##Model Comparison
+
+I use both the KNN and RF model to predict on the testing set and compare the confusion matrix of each model. 
+
+Both models were extremely accurate and gave me concern for overfitting. 
+
+KNN accuracy = .9997
+RF accuracy = 1
+
+```{r}
+predKNN <- predict(modelKNN, myTesting)
+predRF <- predict(modelRF, myTesting)
+```
+
+###KNN Confusion Matrix
+```{r echo=FALSE}
+confusionMatrix(predKNN, myTesting$classe)
+```
+
+###RF Confusion Matrix
+```{r echo = FALSE}
+confusionMatrix(predRF, myTesting$classe)
+```
+
+In an attempt to address potential overfitting I decided to train a new random forest model that would remove "center" & "scale" pre processing and also include cross validation with K = 3. The confusion matrix for this is below and it too has an accuracy of 1.
+
+```{r cache=TRUE}
+modelRF_ctrl <- train(classe~., data = myTraining, method = "rf", trControl = trainControl(method = "cv", number = 3, verboseIter = FALSE))
+predRF_ctrl <- predict(modelRF_ctrl, myTesting)
+confusionMatrix(predRF_ctrl, myTesting$classe)
+```
+
+##Prediction & Conclusion
+
+I use RF with cross validation of K = 3 to predict on the final test set.
+
+The Random Forest model with either preprocessing or cross validation produces extremely an extremely accurate model for predicting whether the barbell lift was done correctly as defined by the 5 classes. 
+
+```{r echo= FALSE}
+predFinal <- predict(modelRF_ctrl, testing)
+predFinal
+
+Results <- data.frame(
+  problem_id=testing$problem_id,
+  predicted=predFinal
+)
+print(Results)
+```
